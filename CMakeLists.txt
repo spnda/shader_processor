@@ -17,7 +17,7 @@ macro(create_shader_targets SHADER_DIRECTORY)
     # We also depend on the shaderprocessor itself so that when it changes we rebuild all shaders.
     add_custom_command(
         OUTPUT build_shaders.timestamp
-        COMMAND ./shaders/shaderprocessor ${SHADER_JSONS}
+        COMMAND $<TARGET_FILE:shaderprocessor> ${SHADER_JSONS}
         COMMAND ${CMAKE_COMMAND} -E touch build_shaders.timestamp
         DEPENDS ${SHADER_FILES} ${SHADER_JSONS} shaderprocessor
         WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
