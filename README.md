@@ -14,8 +14,9 @@ In your CMakeLists.txt, you need to call some functions of the library.
 ```cmake
 add_executable(my_game "game.cpp")
 
-create_shader_targets(shaders)
-add_shader_target_dependency(my_game)
+# This will now search for JSONs in the "shaders" directory, generate targets for them, and add them
+# as a dependency of the "my_game" target.
+create_shader_targets(shaders my_game)
 ```
 
 Everytime you modify one of the JSONs or the shaders they will automatically be rebuilt and packaged when
@@ -31,5 +32,4 @@ building the project.
 - Configurable output directory
 - Shader compression (LZMA?)
 - Support for multiple output directories and targets
-- Per-JSON targets to only recompile affected shaders
 - Better stage resolution. (Input GLSL and target MSL should create a chain of GLSL -> SPIR-V -> MSL)

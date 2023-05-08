@@ -1,5 +1,7 @@
+#include <cassert>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <sstream>
 #include <span>
@@ -254,7 +256,7 @@ int main(int argc, char* argv[]) {
 
 	std::span<char*> args = { std::next(argv), static_cast<size_t>(argc - 1) };
 	for (auto& arg : args) {
-		std::cout << "Parsing " << arg << std::endl;
+		std::cout << "Processing " << fs::relative(arg, fs::current_path()).string() << std::endl;
 		auto ret = processJson(fs::path { arg });
 		if (ret != 0) {
 			return ret;

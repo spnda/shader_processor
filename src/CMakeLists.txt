@@ -1,4 +1,5 @@
 add_library(shadertools)
+add_library(shaderprocessor::shadertools ALIAS shadertools)
 
 target_compile_features(shadertools PRIVATE cxx_std_20)
 target_include_directories(shadertools PUBLIC ${SHADER_PROCESSOR_INCLUDE_DIR})
@@ -8,6 +9,7 @@ target_sources(shadertools PRIVATE shader_binary.cpp
     "${SHADER_PROCESSOR_INCLUDE_DIR}/shaders/shader_constants.hpp")
 
 add_executable(shaderprocessor)
+add_executable(shaderprocessor::shaderprocessor ALIAS shaderprocessor)
 
 if(TARGET glslang)
     target_compile_definitions(shaderprocessor PRIVATE WITH_GLSLANG_SHADERS)
