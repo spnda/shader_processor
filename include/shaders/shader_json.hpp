@@ -13,7 +13,7 @@ namespace shaders {
 	struct ShaderJsonDesc {
 		std::filesystem::path source;
 		ShaderLang lang;
-		ShaderLang targets;
+		ShaderLang target;
 		std::vector<ShaderEntryPoint> entryPoints;
 	};
 

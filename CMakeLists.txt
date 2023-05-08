@@ -14,11 +14,12 @@ macro(create_shader_targets SHADER_DIRECTORY)
     # Create a target that depends on the shaders and shader jsons which has to be built before
     # the game target, in which we execute the shader processor. By creating a build_shaders.timestamp
     # file, we can track the time of the last build to avoid unnecessary recompilations of the shaders.
+    # We also depend on the shaderprocessor itself so that when it changes we rebuild all shaders.
     add_custom_command(
         OUTPUT build_shaders.timestamp
         COMMAND ./shaders/shaderprocessor ${SHADER_JSONS}
         COMMAND ${CMAKE_COMMAND} -E touch build_shaders.timestamp
-        DEPENDS ${SHADER_FILES} ${SHADER_JSONS}
+        DEPENDS ${SHADER_FILES} ${SHADER_JSONS} shaderprocessor
         WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
         VERBATIM
     )

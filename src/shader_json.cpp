@@ -115,6 +115,10 @@ std::int32_t shaders::parseJson(fs::path& path, shaders::ShaderJson& shader) {
 		auto stageTarget = getEnumForJsonString<ShaderLang>(target, "target");
 		auto stageLang = getEnumForJsonString<ShaderLang>(lang, "lang");
 
+		if (std::popcount(static_cast<std::underlying_type_t<decltype(stageTarget)>>(stageTarget)) > 1) {
+			std::cerr << "Only one target output is currently supported." << std::endl;
+		}
+
 		auto sourcePath = fs::path { source.get_string().value() };
 		shader.descriptions.emplace_back(ShaderJsonDesc {
 			.source = folder / sourcePath,
