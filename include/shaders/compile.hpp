@@ -35,11 +35,11 @@ namespace shaders {
 #endif
 
 #ifdef WITH_GLSLANG_SHADERS
-	std::vector<uint32_t> compileGlsl(const ShaderJsonDesc& shaderStage);
+	std::vector<std::uint32_t> compileGlsl(const ShaderJsonDesc& shaderStage);
 #endif
 
 #ifdef WITH_SLANG_SHADERS
-	std::vector<std::vector<uint32_t>> compileSlang(const ShaderJsonStage& shaderStage);
+	std::vector<std::vector<std::uint32_t>> compileSlang(const ShaderJsonStage& shaderStage);
 #endif
 
 #ifdef __APPLE__

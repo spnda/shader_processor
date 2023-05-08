@@ -48,7 +48,7 @@ public:
 
 constexpr EShLanguage getGlslangStage(shaders::ShaderStage inputStage) {
 	using namespace ::shaders;
-	assert(std::popcount(static_cast<uint16_t>(inputStage)) == 1);
+	assert(std::popcount(static_cast<std::uint16_t>(inputStage)) == 1);
 
 	switch (inputStage) {
 		case ShaderStage::Vertex:

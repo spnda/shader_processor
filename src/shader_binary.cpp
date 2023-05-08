@@ -1,3 +1,4 @@
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <span>
@@ -7,12 +8,14 @@
 namespace fs = std::filesystem;
 namespace ks = ::shaders;
 
-std::span<const std::string_view> shaders::ShaderLibrary::getFunctionNames() const {
-	return functionNames;
+std::span<const std::string_view> shaders::ShaderLibrary::getShaderNames() const {
+	return shaderNames;
 }
 
-const shaders::ShaderBinary* shaders::ShaderLibrary::getBinaryByName(std::string_view binaryName) {
-	auto it = std::find_if(binaries.begin(), binaries.end(), [&binaryName](ShaderBinary& binary) { return binary.name == binaryName; });
+const shaders::ShaderBinary* shaders::ShaderLibrary::getShaderBinaryByName(std::string_view shaderName) {
+	auto it = std::find_if(binaries.begin(), binaries.end(), [&shaderName](ShaderBinary& binary) {
+		return binary.shaderName == shaderName;
+	});
 
 	if (it == binaries.end()) {
 		return nullptr;
@@ -20,8 +23,10 @@ const shaders::ShaderBinary* shaders::ShaderLibrary::getBinaryByName(std::string
 	return &(*it);
 }
 
-const shaders::ShaderBinary* shaders::ShaderLibrary::getBinaryByStage(::shaders::ShaderStage stage) {
-	auto it = std::find_if(binaries.begin(), binaries.end(), [&stage](ShaderBinary& binary) { return binary.desc.stage == stage; });
+const shaders::ShaderBinary* shaders::ShaderLibrary::getShaderBinaryByStage(shaders::ShaderStage stage) {
+	auto it = std::find_if(binaries.begin(), binaries.end(), [&stage](ShaderBinary& binary) {
+		return binary.stage == stage;
+	});
 
 	if (it == binaries.end()) {
 		return nullptr;
@@ -31,13 +36,14 @@ const shaders::ShaderBinary* shaders::ShaderLibrary::getBinaryByStage(::shaders:
 
 std::vector<std::byte> shaders::buildShaderLibrary(std::vector<ShaderInput>&& inputs) {
 	// We're not going to profile the shader_preprocessor.exe, so we'll not mark this as a zone.
-	auto inputCount = static_cast<uint16_t>(inputs.size()); // This will also limit it.
+	auto inputCount = static_cast<std::uint16_t>(inputs.size()); // This will also limit it.
 
 	std::vector<std::byte> output;
 
 	size_t totalShaderByteSize = 0;
 	for (const auto& input : inputs) {
 		totalShaderByteSize += input.shaderBytes.size();
+		totalShaderByteSize += input.shaderName.size() + 1;
 		totalShaderByteSize += input.name.size() + 1;
 	}
 
@@ -66,9 +72,10 @@ std::vector<std::byte> shaders::buildShaderLibrary(std::vector<ShaderInput>&& in
 	auto data_offset = sizeof(ShaderFileHeader) + sizeof(ShaderDescription) * inputCount;
 	for (const auto& input : inputs) {
 		ShaderDescription description = {
-			.byteOffset = data_offset + input.name.size(),
+			.byteOffset = data_offset + input.shaderName.size() + input.name.size(),
 			.byteSize = input.shaderBytes.size(),
 			.nameByteOffset = data_offset,
+			.shaderNameByteOffset = data_offset + input.name.size(),
 			.stage = input.stage,
 			.lang = input.lang,
 		};
@@ -79,6 +86,7 @@ std::vector<std::byte> shaders::buildShaderLibrary(std::vector<ShaderInput>&& in
 	// Now that we've written all the headers, we begin writing all the data.
 	for (const auto& input : inputs) {
 		write(input.name.data(), input.name.size());
+		write(input.shaderName.data(), input.shaderName.size());
 		write(input.shaderBytes.data(), input.shaderBytes.size());
 	}
 
@@ -109,33 +117,43 @@ shaders::ShaderLibrary shaders::readShaderLibraryFromFile(const fs::path& path) 
 	read(&header, sizeof header);
 	if (header.magic != headerMagic) {
 		std::string_view magic = { reinterpret_cast<char*>(&header.magic), 4 };
-		std::cerr << "Invalid magic header on shader binary file: " << magic << " != " << headerMagic << std::endl;
+		std::string_view correctMagic = { reinterpret_cast<const char*>(&headerMagic), 4 };
+		std::cerr << "Invalid magic header on shader binary file: " << magic << " != " << correctMagic << std::endl;
 		return {};
 	}
 
 	ShaderLibrary library;
-	library.functionNames.resize(header.shaderCount);
+	library.shaderNames.resize(header.shaderCount);
 	library.binaries.resize(header.shaderCount);
+
+	std::vector<ShaderDescription> descriptions(header.shaderCount);
 
 	// We first read all the shader descriptions
 	for (auto i = 0U; i < header.shaderCount; ++i) {
 		ShaderDescription description = {};
 		read(&description, sizeof description);
-		library.binaries[i].desc = description;
+		descriptions[i] = description;
 	}
 
 	// Then read all names and binaries.
 	for (auto i = 0U; i < header.shaderCount; ++i) {
 		auto& binary = library.binaries[i];
+		auto& desc = descriptions[i];
+
+		binary.stage = desc.stage;
+		binary.lang = desc.lang;
 
 		// We read the name first and determine its size by looking where the shader bytes begin.
-		binary.name.resize(binary.desc.byteOffset - binary.desc.nameByteOffset);
+		binary.name.resize(desc.shaderNameByteOffset - desc.nameByteOffset);
 		read(binary.name.data(), binary.name.size());
 
-		binary.bytes.resize(binary.desc.byteSize);
+		binary.shaderName.resize(desc.byteOffset - desc.shaderNameByteOffset);
+		read(binary.shaderName.data(), binary.shaderName.size());
+
+		binary.bytes.resize(desc.byteSize);
 		read(binary.bytes.data(), binary.bytes.size());
 
-		library.functionNames[i] = binary.name;
+		library.shaderNames[i] = binary.shaderName;
 	}
 
 	return library;

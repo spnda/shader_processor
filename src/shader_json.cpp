@@ -64,6 +64,7 @@ std::int32_t shaders::parseJson(fs::path& path, shaders::ShaderJson& shader) {
 		auto source = element["source"];
 		auto target = element["target"];
 		auto lang = element["lang"];
+		auto shaderName = element["name"];
 
 		if ((source.error() != 0 || target.error() != 0 || lang.error() != 0)
 		    && (!source.is_string() || !target.is_string() || !lang.is_string())) {
@@ -117,13 +118,23 @@ std::int32_t shaders::parseJson(fs::path& path, shaders::ShaderJson& shader) {
 
 		if (std::popcount(static_cast<std::underlying_type_t<decltype(stageTarget)>>(stageTarget)) > 1) {
 			std::cerr << "Only one target output is currently supported." << std::endl;
+			continue;
 		}
 
-		auto sourcePath = fs::path { source.get_string().value() };
+		std::string_view shaderNameView;
+		if (shaderName.error() == 0 && shaderName.is_string()) {
+			shaderNameView = shaderName.get_string();
+		} else {
+			// We'll reuse the source path.
+			shaderNameView = source.get_string();
+		}
+
+		auto sourcePath = fs::path(source.get_string().value());
 		shader.descriptions.emplace_back(ShaderJsonDesc {
 			.source = folder / sourcePath,
 			.lang = stageLang,
-			.targets = stageTarget,
+			.target = stageTarget,
+			.name = std::string(shaderNameView),
 			.entryPoints = std::move(entryPointObjects),
 		});
 	}

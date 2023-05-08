@@ -6,39 +6,45 @@
 #include <vector>
 
 namespace shaders {
-	enum class ShaderStage : uint16_t;
-	enum class ShaderLang : uint8_t;
+	enum class ShaderStage : std::uint16_t;
+	enum class ShaderLang : std::uint8_t;
 
-	[[nodiscard]] constexpr uint32_t fourCharacterCode(char char1, char char2, char char3, char char4) {
-		return static_cast<uint32_t>(char1) | (static_cast<uint32_t>(char2) << 8) | (static_cast<uint32_t>(char3) << 16)
-		       | (static_cast<uint32_t>(char4) << 24);
+	[[nodiscard]] constexpr std::uint32_t fourCharacterCode(char char1, char char2, char char3, char char4) {
+		return static_cast<std::uint32_t>(char1) | (static_cast<std::uint32_t>(char2) << 8) | (static_cast<std::uint32_t>(char3) << 16)
+		       | (static_cast<std::uint32_t>(char4) << 24);
 	}
 
-	inline constinit const auto headerMagic = fourCharacterCode('!', 'K', 'R', 'S');
+	inline constinit const auto headerMagic = fourCharacterCode('!', 'S', 'B', 'F');
 
 	struct ShaderFileHeader {
-		uint32_t magic;
-		// This specifies the count of uint64_t integers directly afterwards that represent
+		std::uint32_t magic;
+		// This specifies the count of uint64_t integers directly afterward that represent
 		// the byte offset into the file excluding this header for that specific shader.
-		uint16_t shaderCount;
+		std::uint16_t shaderCount;
 	};
 
-	struct alignas(uint64_t) ShaderDescription {
-		uint64_t byteOffset;     // The byte offset for the shader binary.
-		uint64_t byteSize;       // The size of the binary.
-		uint64_t nameByteOffset; // The byte offset for the name string.
-		ShaderStage stage;       // 16 bits.
-		ShaderLang lang;         // 8 bits. This should only be SPIR-V or AIR.
+	struct alignas(std::uint64_t) ShaderDescription {
+		std::uint64_t byteOffset;           // The byte offset for the shader binary.
+		std::uint64_t byteSize;             // The size of the binary.
+		std::uint64_t nameByteOffset;       // The byte offset for the entry point name string.
+		std::uint64_t shaderNameByteOffset; // The byte offset for the shader name string.
+		ShaderStage stage;                  // 16 bits.
+		ShaderLang lang;                    // 8 bits. This should only be SPIR-V or AIR.
 	};
 
 	struct ShaderBinary {
-		ShaderDescription desc;
+		ShaderStage stage;
+		ShaderLang lang;
 		std::string name;
+		std::string shaderName;
 		std::vector<std::byte> bytes;
 	};
 
 	struct ShaderInput {
 		std::vector<std::byte> shaderBytes;
+		// The name of the shader that this input comes from.
+		std::string shaderName;
+		// The name of the entry point.
 		std::string name;
 		ShaderStage stage;
 		ShaderLang lang;
@@ -53,14 +59,14 @@ namespace shaders {
 		friend ShaderLibrary readShaderLibraryFromFile(const std::filesystem::path& path);
 
 		std::string name;
-		// Each element in binaries shall make up binary for a single shader function. Each entry
-		// point name will be tracked in the functionNames vector.
-		std::vector<std::string_view> functionNames;
+		std::vector<std::string_view> shaderNames;
 		std::vector<ShaderBinary> binaries;
 
 	public:
-		[[nodiscard]] std::span<const std::string_view> getFunctionNames() const;
-		[[nodiscard]] const ShaderBinary* getBinaryByName(std::string_view name);
-		[[nodiscard]] const ShaderBinary* getBinaryByStage(ShaderStage stage);
+		[[nodiscard]] std::span<const std::string_view> getShaderNames() const;
+		[[nodiscard]] const ShaderBinary* getShaderBinaryByName(std::string_view name);
+		// This will return the first shader in the binary that has the given shader stage, regardless
+		// of whether other shaders with the same stage are available.
+		[[nodiscard]] const ShaderBinary* getShaderBinaryByStage(ShaderStage stage);
 	};
 } // namespace shaders

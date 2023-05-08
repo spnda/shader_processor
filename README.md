@@ -32,3 +32,4 @@ building the project.
 - Shader compression (LZMA?)
 - Support for multiple output directories and targets
 - Per-JSON targets to only recompile affected shaders
+- Better stage resolution. (Input GLSL and target MSL should create a chain of GLSL -> SPIR-V -> MSL)

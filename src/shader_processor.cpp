@@ -58,24 +58,25 @@ std::int32_t processJson(fs::path path) noexcept {
 	auto outputFolder = fs::current_path() / "shaders";
 	std::vector<shaders::ShaderInput> shaderInputs;
 	shaderInputs.reserve(json.descriptions.size());
-	for (auto& stage : json.descriptions) {
-		std::cout << ">> " << stage.source.filename() << std::endl;
-		const auto& frontEntry = stage.entryPoints.front();
+	for (auto& desc : json.descriptions) {
+		std::cout << ">> " << desc.source.filename() << std::endl;
+		const auto& frontEntry = desc.entryPoints.front();
 
 		// If the target is the same as the input, we'll just copy the data.
-		if (stage.target == stage.lang) {
+		if (desc.target == desc.lang) {
 			shaderInputs.emplace_back(shaders::ShaderInput {
-				.shaderBytes = shaders::readFileAsBytes(stage.source),
+				.shaderBytes = shaders::readFileAsBytes(desc.source),
+				.shaderName = desc.name,
 				.name = frontEntry.name,
 				.stage = frontEntry.stage,
-				.lang = stage.target,
+				.lang = desc.target,
 			});
 		}
 
-		switch (stage.lang) {
+		switch (desc.lang) {
 			case shaders::ShaderLang::GLSL: {
 #ifdef WITH_GLSLANG_SHADERS
-				auto spirv = compileGlsl(stage);
+				auto spirv = compileGlsl(desc);
 				if (spirv.empty()) {
 					std::cerr << "Failed to compile GLSL." << std::endl;
 					continue;
@@ -85,20 +86,21 @@ std::int32_t processJson(fs::path path) noexcept {
 				std::vector<std::byte> spirvBytes(spirv.size() * sizeof(std::uint32_t));
 				std::memcpy(spirvBytes.data(), spirv.data(), spirv.size() * sizeof(std::uint32_t));
 
-				if ((stage.target & shaders::ShaderLang::SPIRV) == stage.target) {
+				if ((desc.target & shaders::ShaderLang::SPIRV) == desc.target) {
 					shaderInputs.emplace_back(shaders::ShaderInput {
 #ifdef __APPLE__
 						.shaderBytes = spirvBytes,
 #else
 						.shaderBytes = std::move(spirvBytes),
 #endif
+						.shaderName = desc.name,
 						.name = frontEntry.name,
 						.stage = frontEntry.stage,
 						.lang = shaders::ShaderLang::SPIRV,
 					});
 				}
 #ifdef __APPLE__
-				if (ku::hasBit(stage.target, shaders::ShaderLang::MSL)) {
+				if (ku::hasBit(desc.target, shaders::ShaderLang::MSL)) {
 					auto msl = shaders::generateMslFromSpv(spirvBytes);
 
 					std::vector<std::byte> bytes(msl.size());
@@ -106,8 +108,9 @@ std::int32_t processJson(fs::path path) noexcept {
 
 					shaderInputs.emplace_back(shaders::ShaderInput {
 						.shaderBytes = std::move(bytes),
+						.shaderName = desc.name,
 						.name = frontEntry.name,
-						.stage = frontEntry.stage,
+						.desc = frontEntry.stage,
 						.lang = shaders::ShaderLang::MSL,
 					});
 				}
@@ -117,12 +120,12 @@ std::int32_t processJson(fs::path path) noexcept {
 			}
 			case shaders::ShaderLang::SLANG: {
 #ifdef WITH_SLANG_SHADERS
-				auto spirv = ::shaders::compileSlang(stage);
+				auto spirv = shaders::compileSlang(desc);
 				for (auto it = spirv.begin(); it != spirv.end(); ++it) {
 					auto index = std::distance(spirv.begin(), it);
 
 					if (it->empty()) {
-						kl::err("Failed to compile SLANG: {}", stage.entryPoints[index].name);
+						kl::err("Failed to compile SLANG: {}", desc.entryPoints[index].name);
 						continue;
 					}
 
@@ -130,13 +133,14 @@ std::int32_t processJson(fs::path path) noexcept {
 					std::memcpy(spirvBytes.data(), it->data(), it->size() * sizeof(std::uint32_t));
 					shaderInputs.emplace_back(shaders::ShaderInput {
 						.shaderBytes = std::move(spirvBytes),
-						.name = stage.entryPoints[index].name,
-						.stage = stage.entryPoints[index].stage,
+						.shaderName = desc.name,
+						.name = desc.entryPoints[index].name,
+						.stage = desc.entryPoints[index].stage,
 						.lang = shaders::ShaderLang::SPIRV,
 					});
 
 #ifdef __APPLE__
-					if (ku::hasBit(stage.target, shaders::ShaderLang::MSL)) {
+					if (ku::hasBit(desc.target, shaders::ShaderLang::MSL)) {
 						auto msl = shaders::generateMslFromSpv(spirvBytes);
 						shaderInputs.emplace_back(shaders::ShaderInput {
 							.shaderBytes = std::vector { msl.begin(), msl.end() },
@@ -152,8 +156,8 @@ std::int32_t processJson(fs::path path) noexcept {
 			}
 			case shaders::ShaderLang::MSL: {
 #ifdef __APPLE__
-				if (ku::hasBit(stage.target, shaders::ShaderLang::AIR)) {
-					auto air = shaders::compileMsl(stage);
+				if (ku::hasBit(desc.target, shaders::ShaderLang::AIR)) {
+					auto air = shaders::compileMsl(desc);
 					shaderInputs.emplace_back(shaders::ShaderInput {
 						.shaderBytes = std::move(air),
 						.name = frontEntry.name,
@@ -162,8 +166,8 @@ std::int32_t processJson(fs::path path) noexcept {
 					});
 				}
 
-				if (ku::hasBit(stage.target, shaders::ShaderLang::MSL)) {
-					auto msl = shaders::readFileAsBytes(stage.source);
+				if (ku::hasBit(desc.target, shaders::ShaderLang::MSL)) {
+					auto msl = shaders::readFileAsBytes(desc.source);
 					shaderInputs.emplace_back(shaders::ShaderInput {
 						.shaderBytes = std::move(msl),
 						.name = frontEntry.name,
@@ -175,8 +179,8 @@ std::int32_t processJson(fs::path path) noexcept {
 				break;
 			}
 			case shaders::ShaderLang::SPIRV: {
-				auto shaderBytes = shaders::readFileAsBytes(stage.source);
-				if ((stage.target & shaders::ShaderLang::SPIRV) == stage.target) {
+				auto shaderBytes = shaders::readFileAsBytes(desc.source);
+				if ((desc.target & shaders::ShaderLang::SPIRV) == desc.target) {
 					shaderInputs.emplace_back(shaders::ShaderInput {
 #ifdef __APPLE__
 						.shaderBytes = shaderBytes,
@@ -189,7 +193,7 @@ std::int32_t processJson(fs::path path) noexcept {
 					});
 				}
 #ifdef __APPLE__
-				if (ku::hasBit(stage.target, shaders::ShaderLang::MSL)) {
+				if (ku::hasBit(desc.target, shaders::ShaderLang::MSL)) {
 					auto msl = shaders::generateMslFromSpv(shaderBytes);
 
 					std::vector<std::byte> bytes(msl.size());
@@ -206,19 +210,19 @@ std::int32_t processJson(fs::path path) noexcept {
 				break;
 			}
 			default: {
-				std::cerr << ">> Did not find a method to compile shader stage from source: " << stage.source.filename() << std::endl;
+				std::cerr << ">> Did not find a method to compile shader from source: " << desc.source.filename() << std::endl;
 			}
 		}
 	}
 
 	if (shaderInputs.empty()) {
 		std::cerr << "All shaders failed to compile. Cannot build binary \"" << json.name << "\"." << std::endl;
-		return 0; // We'll try processing other JSONs.
+		return -1;
 	}
 
 	auto binaryBytes = shaders::buildShaderLibrary(std::move(shaderInputs));
 	std::ofstream out(outputFolder / (json.name + ".shader"), std::ios::binary | std::ios::out);
-	out.write(reinterpret_cast<const char*>(binaryBytes.data()), static_cast<int64_t>(binaryBytes.size()));
+	out.write(reinterpret_cast<const char*>(binaryBytes.data()), static_cast<std::int64_t>(binaryBytes.size()));
 
 	return 0;
 }

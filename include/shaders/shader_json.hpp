@@ -14,6 +14,7 @@ namespace shaders {
 		std::filesystem::path source;
 		ShaderLang lang;
 		ShaderLang target;
+		std::string name;
 		std::vector<ShaderEntryPoint> entryPoints;
 	};
 

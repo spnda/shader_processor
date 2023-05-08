@@ -5,7 +5,7 @@
 
 namespace shaders {
 	// clang-format off
-	enum class ShaderLang : uint8_t {
+	enum class ShaderLang : std::uint8_t {
 		GLSL    = 1 << 0,
 		HLSL    = 1 << 1,
 		SLANG   = 1 << 2,
@@ -21,7 +21,7 @@ namespace shaders {
 	// clang-format on
 
 	// We do 1.3 to 1.6.
-	enum class SPVVersion : uint8_t {
+	enum class SPVVersion : std::uint8_t {
 		SPV_1_3, // Vulkan 1.1
 		SPV_1_4, // Requires KHR_spirv_1_4 (1.1) or Vulkan 1.2
 		SPV_1_5, // Requires Vulkan 1.2
@@ -29,7 +29,7 @@ namespace shaders {
 	};
 
 	// clang-format off
-	enum class ShaderStage : uint16_t {
+	enum class ShaderStage : std::uint16_t {
 		None        = 0,
 		Vertex      = 1 <<  0,
 		Fragment    = 1 <<  1,

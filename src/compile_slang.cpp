@@ -6,7 +6,7 @@
 
 SlangStage getSlangStage(shaders::ShaderStage inputStage) {
 	using namespace ks;
-	VERIFY(std::popcount(static_cast<uint16_t>(inputStage)) == 1);
+	VERIFY(std::popcount(static_cast<std::std::uint16_t>(inputStage)) == 1);
 
 	switch (inputStage) {
 		case ShaderStage::Vertex:
@@ -32,7 +32,7 @@ SlangStage getSlangStage(shaders::ShaderStage inputStage) {
 		case ShaderStage::Callable:
 			return SLANG_STAGE_CALLABLE;
 		default:
-			kl::throwError("[slang] Unrecognized shader stage type: {}.", static_cast<uint16_t>(inputStage));
+			kl::throwError("[slang] Unrecognized shader stage type: {}.", static_cast<std::uint16_t>(inputStage));
 	}
 }
 
