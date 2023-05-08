@@ -78,137 +78,67 @@ std::int32_t processJson(fs::path path) noexcept {
 		switch (desc.lang) {
 			case shaders::ShaderLang::GLSL: {
 #ifdef WITH_GLSLANG_SHADERS
-				auto spirv = compileGlsl(desc);
-				if (spirv.empty()) {
-					std::cerr << "Failed to compile GLSL." << std::endl;
-					continue;
+				if (desc.entryPoints.size() > 1 && !desc.entryPoints.empty()) {
+					std::cerr << ">> Cannot compile GLSL with more than 1 entry points." << std::endl;
+					return -1;
 				}
 
-				// We need to copy here. It breaks the data if we use vector constructors.
-				std::vector<std::byte> spirvBytes(spirv.size() * sizeof(std::uint32_t));
-				std::memcpy(spirvBytes.data(), spirv.data(), spirv.size() * sizeof(std::uint32_t));
+				if (desc.target == shaders::ShaderLang::SPIRV) {
+					auto spirv = shaders::compileGlsl(desc);
+					if (spirv.empty()) {
+						std::cerr << ">> Failed to compile glslang: " << desc.name << std::endl;
+						return -1;
+					}
 
-				if ((desc.target & shaders::ShaderLang::SPIRV) == desc.target) {
+					std::vector<std::byte> spirvBytes(spirv.size() * sizeof(std::uint32_t));
+					std::memcpy(spirvBytes.data(), spirv.data(), spirvBytes.size());
+
 					shaderInputs.emplace_back(shaders::ShaderInput {
-#ifdef __APPLE__
 						.shaderBytes = spirvBytes,
-#else
-						.shaderBytes = std::move(spirvBytes),
-#endif
 						.shaderName = desc.name,
 						.name = frontEntry.name,
 						.stage = frontEntry.stage,
 						.lang = shaders::ShaderLang::SPIRV,
 					});
-				}
-#ifdef __APPLE__
-				if (ku::hasBit(desc.target, shaders::ShaderLang::MSL)) {
-					auto msl = shaders::generateMslFromSpv(spirvBytes);
-
-					std::vector<std::byte> bytes(msl.size());
-					std::memcpy(bytes.data(), msl.data(), msl.size());
-
-					shaderInputs.emplace_back(shaders::ShaderInput {
-						.shaderBytes = std::move(bytes),
-						.shaderName = desc.name,
-						.name = frontEntry.name,
-						.desc = frontEntry.stage,
-						.lang = shaders::ShaderLang::MSL,
-					});
-				}
+				} else
 #endif
-#endif
+				{
+					std::cerr << ">> Cannot compile GLSL." << std::endl;
+				}
 				break;
 			}
 			case shaders::ShaderLang::SLANG: {
 #ifdef WITH_SLANG_SHADERS
-				auto spirv = shaders::compileSlang(desc);
-				for (auto it = spirv.begin(); it != spirv.end(); ++it) {
-					auto index = std::distance(spirv.begin(), it);
-
-					if (it->empty()) {
-						kl::err("Failed to compile SLANG: {}", desc.entryPoints[index].name);
-						continue;
+				if (desc.target == shaders::ShaderLang::SPIRV) {
+					auto spirv = shaders::compileSlang(desc);
+					if (spirv.empty()) {
+						std::cerr << ">> Failed to compile slang: " << desc.name << std::endl;
+						return -1;
 					}
 
-					std::vector<std::byte> spirvBytes(it->size() * sizeof(std::uint32_t));
-					std::memcpy(spirvBytes.data(), it->data(), it->size() * sizeof(std::uint32_t));
-					shaderInputs.emplace_back(shaders::ShaderInput {
-						.shaderBytes = std::move(spirvBytes),
-						.shaderName = desc.name,
-						.name = desc.entryPoints[index].name,
-						.stage = desc.entryPoints[index].stage,
-						.lang = shaders::ShaderLang::SPIRV,
-					});
+					for (auto it = spirv.begin(); it != spirv.end(); ++it) {
+						auto index = std::distance(spirv.begin(), it);
 
-#ifdef __APPLE__
-					if (ku::hasBit(desc.target, shaders::ShaderLang::MSL)) {
-						auto msl = shaders::generateMslFromSpv(spirvBytes);
+						if (it->empty()) {
+							std::cerr << ">> Failed to compile slang: " << desc.entryPoints[index].name << std::endl;
+							return -1;
+						}
+
+						std::vector<std::byte> spirvBytes(it->size() * sizeof(std::uint32_t));
+						std::memcpy(spirvBytes.data(), it->data(), it->size() * sizeof(std::uint32_t));
 						shaderInputs.emplace_back(shaders::ShaderInput {
-							.shaderBytes = std::vector { msl.begin(), msl.end() },
-							.name = frontEntry.name,
-							.stage = frontEntry.stage,
-							.lang = shaders::ShaderLang::MSL,
+							.shaderBytes = std::move(spirvBytes),
+							.shaderName = desc.name,
+							.name = desc.entryPoints[index].name,
+							.stage = desc.entryPoints[index].stage,
+							.lang = shaders::ShaderLang::SPIRV,
 						});
 					}
+				} else
 #endif
+				{
+					std::cerr << ">> Cannot compile slang." << std::endl;
 				}
-#endif
-				break;
-			}
-			case shaders::ShaderLang::MSL: {
-#ifdef __APPLE__
-				if (ku::hasBit(desc.target, shaders::ShaderLang::AIR)) {
-					auto air = shaders::compileMsl(desc);
-					shaderInputs.emplace_back(shaders::ShaderInput {
-						.shaderBytes = std::move(air),
-						.name = frontEntry.name,
-						.stage = frontEntry.stage,
-						.lang = shaders::ShaderLang::AIR,
-					});
-				}
-
-				if (ku::hasBit(desc.target, shaders::ShaderLang::MSL)) {
-					auto msl = shaders::readFileAsBytes(desc.source);
-					shaderInputs.emplace_back(shaders::ShaderInput {
-						.shaderBytes = std::move(msl),
-						.name = frontEntry.name,
-						.stage = frontEntry.stage,
-						.lang = shaders::ShaderLang::MSL,
-					});
-				}
-#endif
-				break;
-			}
-			case shaders::ShaderLang::SPIRV: {
-				auto shaderBytes = shaders::readFileAsBytes(desc.source);
-				if ((desc.target & shaders::ShaderLang::SPIRV) == desc.target) {
-					shaderInputs.emplace_back(shaders::ShaderInput {
-#ifdef __APPLE__
-						.shaderBytes = shaderBytes,
-#else
-						.shaderBytes = std::move(shaderBytes),
-#endif
-						.name = frontEntry.name,
-						.stage = frontEntry.stage,
-						.lang = shaders::ShaderLang::SPIRV,
-					});
-				}
-#ifdef __APPLE__
-				if (ku::hasBit(desc.target, shaders::ShaderLang::MSL)) {
-					auto msl = shaders::generateMslFromSpv(shaderBytes);
-
-					std::vector<std::byte> bytes(msl.size());
-					std::memcpy(bytes.data(), msl.data(), msl.size());
-
-					shaderInputs.emplace_back(shaders::ShaderInput {
-						.shaderBytes = std::move(bytes),
-						.name = frontEntry.name,
-						.stage = frontEntry.stage,
-						.lang = shaders::ShaderLang::MSL,
-					});
-				}
-#endif
 				break;
 			}
 			default: {

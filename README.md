@@ -25,8 +25,8 @@ building the project.
 ## Supported compilers
 - [glslang](https://github.com/KhronosGroup/glslang)
 - [slangc](https://github.com/shader-slang/slang)
-- [spirv-cross](https://github.com/KhronosGroup/SPIRV-Cross)
-- Metal
+
+Support for HLSL, Metal, and SPIRV-Cross will be added in the future.
 
 ## TODOs
 - Configurable output directory
